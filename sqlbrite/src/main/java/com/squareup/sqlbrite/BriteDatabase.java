@@ -212,7 +212,7 @@ public final class BriteDatabase implements Closeable {
     SqliteTransaction transaction = new SqliteTransaction(transactions.get());
     transactions.set(transaction);
     if (logging) log("TXN BEGIN %s", transaction);
-    getWriteableDatabase().beginTransactionWithListener(transaction);
+    getWriteableDatabase().beginTransactionWithListenerNonExclusive(transaction);
 
     return this.transaction;
   }
