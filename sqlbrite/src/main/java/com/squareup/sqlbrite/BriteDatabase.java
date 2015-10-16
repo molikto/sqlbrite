@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -143,13 +144,29 @@ public final class BriteDatabase implements Closeable {
     return db;
   }
 
-  private void sendTableTrigger(Set<String> tables) {
+  // the change is like this:
+  // you can only notify a change on a **leave**, but all nodes above will be triggered
+  public static Set<String> pathsToIntervals(Set<String> paths) {
+    Set<String> a = new HashSet<>(paths.size());
+    for (String p : paths) {
+      for (int i = 0; i < p.length(); i++) {
+        if (p.charAt(i) == '/') {
+          a.add(p.substring(0, i));
+        }
+        a.add(p);
+      }
+    }
+    return a;
+  }
+
+  private void sendTableTrigger(Set<String> paths) {
     SqliteTransaction transaction = transactions.get();
     if (transaction != null) {
-      transaction.addAll(tables);
+
+      transaction.addAll(pathsToIntervals(paths));
     } else {
-      if (logging) log("TRIGGER %s", tables);
-      triggers.onNext(tables);
+      if (logging) log("TRIGGER %s", paths);
+      triggers.onNext(pathsToIntervals(paths));
     }
   }
 
@@ -232,45 +249,45 @@ public final class BriteDatabase implements Closeable {
    * @see SQLiteDatabase#rawQuery(String, String[])
    */
   @CheckResult @NonNull
-  public QueryObservable createQuery(@NonNull final String table, @NonNull String sql,
+  public QueryObservable createQuery(@NonNull final String triggerPath, @NonNull String sql,
       @NonNull String... args) {
     Func1<Set<String>, Boolean> tableFilter = new Func1<Set<String>, Boolean>() {
       @Override public Boolean call(Set<String> triggers) {
-        return triggers.contains(table);
+        return triggers.contains(triggerPath);
       }
 
       @Override public String toString() {
-        return table;
+        return triggerPath;
       }
     };
     return createQuery(tableFilter, sql, args);
   }
 
-  /**
-   * See {@link #createQuery(String, String, String...)} for usage. This overload allows for
-   * monitoring multiple tables for changes.
-   *
-   * @see SQLiteDatabase#rawQuery(String, String[])
-   */
-  @CheckResult @NonNull
-  public QueryObservable createQuery(@NonNull final Iterable<String> tables, @NonNull String sql,
-      @NonNull String... args) {
-    Func1<Set<String>, Boolean> tableFilter = new Func1<Set<String>, Boolean>() {
-      @Override public Boolean call(Set<String> triggers) {
-        for (String table : tables) {
-          if (triggers.contains(table)) {
-            return true;
-          }
-        }
-        return false;
-      }
-
-      @Override public String toString() {
-        return tables.toString();
-      }
-    };
-    return createQuery(tableFilter, sql, args);
-  }
+//  /**
+//   * See {@link #createQuery(String, String, String...)} for usage. This overload allows for
+//   * monitoring multiple tables for changes.
+//   *
+//   * @see SQLiteDatabase#rawQuery(String, String[])
+//   */
+//  @CheckResult @NonNull
+//  public QueryObservable createQuery(@NonNull final Iterable<String> tables, @NonNull String sql,
+//      @NonNull String... args) {
+//    Func1<Set<String>, Boolean> tableFilter = new Func1<Set<String>, Boolean>() {
+//      @Override public Boolean call(Set<String> triggers) {
+//        for (String table : tables) {
+//          if (triggers.contains(table)) {
+//            return true;
+//          }
+//        }
+//        return false;
+//      }
+//
+//      @Override public String toString() {
+//        return tables.toString();
+//      }
+//    };
+//    return createQuery(tableFilter, sql, args);
+//  }
 
   @CheckResult @NonNull
   private QueryObservable createQuery(final Func1<Set<String>, Boolean> tableFilter,
@@ -330,8 +347,8 @@ public final class BriteDatabase implements Closeable {
    * @see SQLiteDatabase#insert(String, String, ContentValues)
    */
   // TODO @WorkerThread
-  public long insert(@NonNull String table, @NonNull ContentValues values) {
-    return insert(table, values, CONFLICT_NONE);
+  public long insert(@NonNull String triggerPath, @NonNull String table, @NonNull ContentValues values) {
+    return insert(triggerPath, table, values, CONFLICT_NONE);
   }
 
   /**
@@ -340,8 +357,8 @@ public final class BriteDatabase implements Closeable {
    * @see SQLiteDatabase#insertWithOnConflict(String, String, ContentValues, int)
    */
   // TODO @WorkerThread
-  public long insert(@NonNull String table, @NonNull ContentValues values,
-      @ConflictAlgorithm int conflictAlgorithm) {
+  public long insert(String triggerPath, @NonNull String table, @NonNull ContentValues values,
+                     @ConflictAlgorithm int conflictAlgorithm) {
     SQLiteDatabase db = getWriteableDatabase();
 
     if (logging) {
@@ -354,7 +371,7 @@ public final class BriteDatabase implements Closeable {
 
     if (rowId != -1) {
       // Only send a table trigger if the insert was successful.
-      sendTableTrigger(Collections.singleton(table));
+      sendTableTrigger(Collections.singleton(triggerPath));
     }
     return rowId;
   }
@@ -366,7 +383,7 @@ public final class BriteDatabase implements Closeable {
    * @see SQLiteDatabase#delete(String, String, String[])
    */
   // TODO @WorkerThread
-  public int delete(@NonNull String table, @Nullable String whereClause,
+  public int delete(@NonNull String triggerPath, @NonNull String table, @Nullable String whereClause,
       @Nullable String... whereArgs) {
     SQLiteDatabase db = getWriteableDatabase();
 
@@ -380,7 +397,7 @@ public final class BriteDatabase implements Closeable {
 
     if (rows > 0) {
       // Only send a table trigger if rows were affected.
-      sendTableTrigger(Collections.singleton(table));
+      sendTableTrigger(Collections.singleton(triggerPath));
     }
     return rows;
   }
@@ -392,9 +409,9 @@ public final class BriteDatabase implements Closeable {
    * @see SQLiteDatabase#update(String, ContentValues, String, String[])
    */
   // TODO @WorkerThread
-  public int update(@NonNull String table, @NonNull ContentValues values,
+  public int update(@NonNull String triggerPath, @NonNull String table, @NonNull ContentValues values,
       @Nullable String whereClause, @Nullable String... whereArgs) {
-    return update(table, values, CONFLICT_NONE, whereClause, whereArgs);
+    return update(triggerPath, table, values, CONFLICT_NONE, whereClause, whereArgs);
   }
 
   /**
@@ -404,9 +421,9 @@ public final class BriteDatabase implements Closeable {
    * @see SQLiteDatabase#updateWithOnConflict(String, ContentValues, String, String[], int)
    */
   // TODO @WorkerThread
-  public int update(@NonNull String table, @NonNull ContentValues values,
-      @ConflictAlgorithm int conflictAlgorithm, @Nullable String whereClause,
-      @Nullable String... whereArgs) {
+  public int update(@NonNull String triggerPath, @NonNull String table,
+                    ContentValues values, @ConflictAlgorithm int conflictAlgorithm, @Nullable String whereClause,
+                    @Nullable String... whereArgs) {
     SQLiteDatabase db = getWriteableDatabase();
 
     if (logging) {
@@ -420,7 +437,7 @@ public final class BriteDatabase implements Closeable {
 
     if (rows > 0) {
       // Only send a table trigger if rows were affected.
-      sendTableTrigger(Collections.singleton(table));
+      sendTableTrigger(Collections.singleton(triggerPath));
     }
     return rows;
   }

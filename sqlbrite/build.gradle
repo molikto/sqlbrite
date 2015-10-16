@@ -1,20 +1,8 @@
-buildscript {
-  dependencies {
-    classpath rootProject.ext.androidPlugin
-  }
-}
-
 apply plugin: 'com.android.library'
-apply from: rootProject.file('gradle/android-findbugs.gradle')
 
 dependencies {
-  compile rootProject.ext.rxJava
-  compile rootProject.ext.supportAnnotations
-
-  androidTestCompile rootProject.ext.supportTestRunner
-  androidTestCompile(rootProject.ext.truth) {
-    exclude group: 'junit' // Android has JUnit built in.
-  }
+  compile 'io.reactivex:rxjava:1.0.3'
+  compile  'com.android.support:support-annotations:23.0.1'
 }
 
 def isCi() {
@@ -22,11 +10,10 @@ def isCi() {
 }
 
 android {
-  compileSdkVersion rootProject.ext.compileSdkVersion
-  buildToolsVersion rootProject.ext.buildToolsVersion
+  compileSdkVersion 23
+  buildToolsVersion "23.0.1"
 
   defaultConfig {
-    testInstrumentationRunner 'android.support.test.runner.AndroidJUnitRunner'
   }
 
   compileOptions {
@@ -66,4 +53,4 @@ if (isCi()) {
   }
 }
 
-apply from: rootProject.file('gradle/gradle-mvn-push.gradle')
+//apply from: rootProject.file('gradle/gradle-mvn-push.gradle')
