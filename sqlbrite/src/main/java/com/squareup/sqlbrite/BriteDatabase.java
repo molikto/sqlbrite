@@ -159,6 +159,10 @@ public final class BriteDatabase implements Closeable {
     return a;
   }
 
+  public boolean hasTransaction() {
+    return transactions.get() != null;
+  }
+
   private void sendTableTrigger(Set<String> paths) {
     SqliteTransaction transaction = transactions.get();
     if (transaction != null) {
