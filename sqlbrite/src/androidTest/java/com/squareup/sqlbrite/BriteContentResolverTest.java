@@ -29,7 +29,6 @@ import java.util.Map;
 import rx.Subscription;
 import rx.subscriptions.Subscriptions;
 
-import static com.google.common.truth.Truth.assertThat;
 
 public final class BriteContentResolverTest
     extends ProviderTestCase2<BriteContentResolverTest.TestContentProvider> {
