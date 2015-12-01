@@ -174,6 +174,10 @@ public final class BriteDatabase implements Closeable {
     }
   }
 
+  public PublishSubject<Set<String>> debug_triggers() {
+    return triggers;
+  }
+
   /**
    * Begin a transaction for this thread.
    * <p>
