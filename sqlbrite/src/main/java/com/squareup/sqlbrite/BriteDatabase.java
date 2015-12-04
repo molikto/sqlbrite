@@ -24,16 +24,21 @@ import android.support.annotation.CheckResult;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.util.Log;
+
 import com.squareup.sqlbrite.SqlBrite.Query;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import rx.Observable;
 import rx.functions.Func1;
 import rx.subjects.PublishSubject;
@@ -55,6 +60,8 @@ public final class BriteDatabase implements Closeable {
 
   private final SQLiteOpenHelper helper;
   private final SqlBrite.Logger logger;
+
+  public static boolean DEBUG = false;
 
   // Package-private to avoid synthetic accessor method for 'transaction' instance.
   final ThreadLocal<SqliteTransaction> transactions = new ThreadLocal<>();
@@ -261,7 +268,11 @@ public final class BriteDatabase implements Closeable {
       @NonNull String... args) {
     Func1<Set<String>, Boolean> tableFilter = new Func1<Set<String>, Boolean>() {
       @Override public Boolean call(Set<String> triggers) {
-        return triggers.contains(triggerPath);
+        boolean res = triggers.contains(triggerPath);
+        if (res && DEBUG) {
+          Log.d("sqlite", "triggered " + triggerPath);
+        }
+        return res;
       }
 
       @Override public String toString() {
@@ -379,9 +390,27 @@ public final class BriteDatabase implements Closeable {
 
     if (rowId != -1) {
       // Only send a table trigger if the insert was successful.
+      if (DEBUG) {
+        Log.d("sqlite", "sending triggers " + mkString(triggerPath, ", "));
+      }
       sendTableTrigger(triggerPath);
     }
     return rowId;
+  }
+
+  public static <T> String mkString(Collection<T> os, String s) {
+    if (os == null) return null;
+    StringBuilder sb = new StringBuilder();
+    for (Object o : os) {
+      if (o != null) {
+        sb.append(o.toString());
+        sb.append(s);
+      }
+    }
+    if (sb.length() > 0) {
+      sb.setLength(sb.length() - s.length());
+    }
+    return sb.toString();
   }
 
   /**
