@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import rx.Observable;
+import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.subjects.PublishSubject;
 
@@ -82,7 +83,7 @@ public final class BriteDatabase implements Closeable {
       return getWriteableDatabase().yieldIfContendedSafely(sleepUnit.toMillis(sleepAmount));
     }
 
-    @Override public void end() {
+    @Override public void end(Action0 runs, Action0 fails) {
       SqliteTransaction transaction = transactions.get();
       if (transaction == null) {
         throw new IllegalStateException("Not in transaction.");
@@ -96,12 +97,26 @@ public final class BriteDatabase implements Closeable {
         if (DEBUG) {
           Log.d("sqlite", "sending triggers " + mkString(transaction, ", "));
         }
+        runs.call();
         sendTableTrigger(transaction);
+      } else {
+        fails.call();
       }
     }
 
     @Override public void close() {
-      end();
+      end(new Action0() {
+            @Override
+            public void call() {
+
+            }
+          }, new Action0() {
+            @Override
+            public void call() {
+
+            }
+          }
+      );
     }
   };
 
@@ -491,7 +506,7 @@ public final class BriteDatabase implements Closeable {
      * @see SQLiteDatabase#endTransaction()
      */
     // TODO @WorkerThread
-    void end();
+    void end(Action0 ifSuccessful, Action0 ifFailed);
 
     /**
      * Marks the current transaction as successful. Do not do any more database work between
