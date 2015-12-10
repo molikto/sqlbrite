@@ -94,10 +94,10 @@ public final class BriteDatabase implements Closeable {
       getWriteableDatabase().endTransaction();
       // Send the triggers after ending the transaction in the DB.
       if (transaction.commit) {
+        runs.call();
         if (DEBUG) {
           Log.d("sqlite", "sending triggers " + mkString(transaction, ", "));
         }
-        runs.call();
         sendTableTrigger(transaction);
       } else {
         fails.call();
@@ -195,9 +195,6 @@ public final class BriteDatabase implements Closeable {
       transaction.addAll(pathsToIntervals(paths));
     } else {
       if (logging) log("TRIGGER %s", paths);
-      if (DEBUG) {
-        Log.d("sqlite", "sending triggers " + mkString(paths, ", "));
-      }
       triggers.onNext(pathsToIntervals(paths));
     }
   }
