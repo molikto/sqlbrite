@@ -1,8 +1,8 @@
 apply plugin: 'com.android.library'
 
 dependencies {
-  compile 'io.reactivex:rxjava:1.0.3'
-  compile  'com.android.support:support-annotations:23.1.0'
+  compile 'io.reactivex:rxjava:1.0.8'
+  compile  'com.android.support:support-annotations:23.1.1'
 }
 
 def isCi() {
